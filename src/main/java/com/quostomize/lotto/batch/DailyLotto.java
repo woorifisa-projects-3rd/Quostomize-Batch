@@ -5,9 +5,10 @@ import com.quostomize.lotto.entity.DailyLottoWinner;
 import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import com.quostomize.lotto.repository.LottoWinnerRecordRepository;
+import org.springframework.batch.core.ChunkListener;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
-import org.springframework.batch.core.annotation.BeforeChunk;
+import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -27,13 +28,20 @@ import java.util.Random;
 @Configuration
 public class DailyLotto {
 
-    private final Long totalParticipants;
+    private long totalParticipants;
+    private long restParticipants;
+    private int randomIndex;
+
     private final JobRepository jobRepository;
     private final PlatformTransactionManager platformTransactionManager;
 
     private final DailyLottoWinnerRepository dailyLottoWinnerRepository;
     private final DailyLottoParticipantRepository dailyLottoParticipantRepository;
     private final LottoWinnerRecordRepository lottoWinnerRecordRepository;
+
+    private final Random random;
+
+    private int cnt = 0;
 
     public DailyLotto(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, DailyLottoWinnerRepository dailyLottoWinnerRepository, DailyLottoParticipantRepository dailyLottoParticipantRepository, LottoWinnerRecordRepository lottoWinnerRecordRepository) {
         this.jobRepository = jobRepository;
@@ -42,6 +50,13 @@ public class DailyLotto {
         this.dailyLottoParticipantRepository = dailyLottoParticipantRepository;
         this.lottoWinnerRecordRepository = lottoWinnerRecordRepository;
         this.totalParticipants = dailyLottoParticipantRepository.count();
+        this.restParticipants = this.totalParticipants;
+        this.random = new Random();
+        if (this.restParticipants >= 1000) {
+            this.randomIndex = this.random.nextInt(1000);
+        } else {
+            this.randomIndex = this.random.nextInt((int) this.restParticipants);
+        }
     }
 
 
@@ -59,6 +74,41 @@ public class DailyLotto {
                 .reader(participantReader())
                 .processor(drawingProcessor())
                 .writer(winnerWriter())
+                .listener(
+                        new ChunkListener() {
+                            @Override
+                            public void beforeChunk(ChunkContext context) {
+                                ChunkListener.super.beforeChunk(context);
+                            }
+
+                            @Override
+                            public void afterChunk(ChunkContext context) {
+                                ChunkListener.super.afterChunk(context);
+                                StepExecution stepExecution = context.getStepContext().getStepExecution();
+                                long getItems = stepExecution.getReadCount();
+                                System.out.println("전체 참여자 = "+totalParticipants);
+                                System.out.println("불러왔던 아이템들 개수 = "+ getItems);
+                                restParticipants = totalParticipants - getItems;
+                                System.out.println("랜덤인덱스 = "+ randomIndex+ "였음");
+                                System.out.println("현재 restParticipant = " +restParticipants  );
+                                if (restParticipants >= 1000) {
+                                    randomIndex = random.nextInt(1000);
+                                } else if (restParticipants == 0) {
+                                    restParticipants = totalParticipants;
+                                } else {
+                                    randomIndex = random.nextInt((int) restParticipants);
+                                }
+                                System.out.println("다음 랜덤인덱스 = "+ randomIndex+ "임");
+                                System.out.println("남은 개수 = " + restParticipants);
+                                cnt = 0;
+                            }
+
+                            @Override
+                            public void afterChunkError(ChunkContext context) {
+                                ChunkListener.super.afterChunkError(context);
+                            }
+                        }
+                )
                 .build();
 
     }
@@ -73,36 +123,17 @@ public class DailyLotto {
                 .repository(dailyLottoParticipantRepository)
                 .sorts(new HashMap<>())
                 .build();
-
     }
 
     @Bean
     public ItemProcessor<DailyLottoParticipant, DailyLottoWinner> drawingProcessor() {
-
         return new ItemProcessor<DailyLottoParticipant, DailyLottoWinner>() {
-            private int cnt = 0;
-            private final Random random = new Random();
-            private DailyLottoParticipant selectedParticipant = null;
-
-            @BeforeChunk
-            public void beforeChunk(ChunkContext context) {
-
-            }
 
             @Override
             public DailyLottoWinner process(DailyLottoParticipant item) throws Exception {
                 cnt ++;
-
-                if (cnt == 1) {
-                    selectedParticipant = item;
-                } else {
-                    if (random.nextInt(cnt) == 0) {
-                        selectedParticipant = item;
-                    }
-                }
-
-                if (cnt == 1000) {
-                    cnt = 0;
+                if (cnt == randomIndex) {
+                    return DailyLottoWinner.fromParticipant(item);
                 }
 
                 return null;
@@ -110,9 +141,9 @@ public class DailyLotto {
         };
     }
 
+
     @Bean
     public RepositoryItemWriter<DailyLottoWinner> winnerWriter() {
-
         return new RepositoryItemWriterBuilder<DailyLottoWinner>()
                 .repository(dailyLottoWinnerRepository)
                 .methodName("save")
