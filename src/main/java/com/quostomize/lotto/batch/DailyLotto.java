@@ -5,24 +5,29 @@ import com.quostomize.lotto.entity.DailyLottoWinner;
 import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import com.quostomize.lotto.repository.LottoWinnerRecordRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.annotation.BeforeChunk;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.data.RepositoryItemReader;
+import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.data.builder.RepositoryItemReaderBuilder;
+import org.springframework.batch.item.data.builder.RepositoryItemWriterBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.util.HashMap;
+import java.util.Random;
+
 @Configuration
-@RequiredArgsConstructor
 public class DailyLotto {
 
-    private final Long totalParticipant;
-    private int current = 0;
+    private final Long totalParticipants;
     private final JobRepository jobRepository;
     private final PlatformTransactionManager platformTransactionManager;
 
@@ -36,7 +41,7 @@ public class DailyLotto {
         this.dailyLottoWinnerRepository = dailyLottoWinnerRepository;
         this.dailyLottoParticipantRepository = dailyLottoParticipantRepository;
         this.lottoWinnerRecordRepository = lottoWinnerRecordRepository;
-        this.totalParticipant = dailyLottoParticipantRepository.count();
+        this.totalParticipants = dailyLottoParticipantRepository.count();
     }
 
 
@@ -52,8 +57,8 @@ public class DailyLotto {
         return new StepBuilder("lottoStep", jobRepository)
                 .<DailyLottoParticipant, DailyLottoWinner> chunk(1000, platformTransactionManager)
                 .reader(participantReader())
-                .processor()
-                .writer()
+                .processor(drawingProcessor())
+                .writer(winnerWriter())
                 .build();
 
     }
@@ -66,11 +71,52 @@ public class DailyLotto {
                 .pageSize(1000)
                 .methodName("findAll")
                 .repository(dailyLottoParticipantRepository)
+                .sorts(new HashMap<>())
                 .build();
 
     }
 
+    @Bean
+    public ItemProcessor<DailyLottoParticipant, DailyLottoWinner> drawingProcessor() {
 
+        return new ItemProcessor<DailyLottoParticipant, DailyLottoWinner>() {
+            private int cnt = 0;
+            private final Random random = new Random();
+            private DailyLottoParticipant selectedParticipant = null;
 
+            @BeforeChunk
+            public void beforeChunk(ChunkContext context) {
+
+            }
+
+            @Override
+            public DailyLottoWinner process(DailyLottoParticipant item) throws Exception {
+                cnt ++;
+
+                if (cnt == 1) {
+                    selectedParticipant = item;
+                } else {
+                    if (random.nextInt(cnt) == 0) {
+                        selectedParticipant = item;
+                    }
+                }
+
+                if (cnt == 1000) {
+                    cnt = 0;
+                }
+
+                return null;
+            }
+        };
+    }
+
+    @Bean
+    public RepositoryItemWriter<DailyLottoWinner> winnerWriter() {
+
+        return new RepositoryItemWriterBuilder<DailyLottoWinner>()
+                .repository(dailyLottoWinnerRepository)
+                .methodName("save")
+                .build();
+    }
 
 }

@@ -23,6 +23,7 @@ public class MetaDBConfig {
     @Primary
     @Bean
     public PlatformTransactionManager metaTransactionManager() {
+
         return new DataSourceTransactionManager(metaDBSource());
     }
 }
