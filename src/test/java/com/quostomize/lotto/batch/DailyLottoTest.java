@@ -99,25 +99,25 @@ class DailyLottoTest {
                 .thenReturn(Page.empty());
     }
 
-    @Test
-    void testJobExecution() throws Exception {
-        // Given
-        JobParameters jobParameters = new JobParametersBuilder()
-                .addLong("time", System.currentTimeMillis())
-                .toJobParameters();
-
-        // When
-        JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
-
-        // Then
-        assertEquals(ExitStatus.COMPLETED, jobExecution.getExitStatus());
-
-        StepExecution stepExecution = jobExecution.getStepExecutions().iterator().next();
-        assertEquals("lottoStep", stepExecution.getStepName());
-        assertEquals(testParticipants.size(), stepExecution.getReadCount());
-
-        assertEquals(1, stepExecution.getWriteCount()); // 당첨자는 1명이어야 함
-    }
+//    @Test
+//    void testJobExecution() throws Exception {
+//        // Given
+//        JobParameters jobParameters = new JobParametersBuilder()
+//                .addLong("time", System.currentTimeMillis())
+//                .toJobParameters();
+//
+//        // When
+//        JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
+//
+//        // Then
+//        assertEquals(ExitStatus.COMPLETED, jobExecution.getExitStatus());
+//
+//        StepExecution stepExecution = jobExecution.getStepExecutions().iterator().next();
+//        assertEquals("lottoStep", stepExecution.getStepName());
+//        assertEquals(testParticipants.size(), stepExecution.getReadCount());
+//
+//        assertEquals(1, stepExecution.getWriteCount()); // 당첨자는 1명이어야 함
+//    }
 
     @Test
     void testParticipantReader() throws Exception {

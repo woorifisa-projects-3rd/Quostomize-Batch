@@ -5,7 +5,6 @@ import com.quostomize.lotto.entity.DailyLottoWinner;
 import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import com.quostomize.lotto.repository.LottoWinnerRecordRepository;
-import jakarta.annotation.PostConstruct;
 import org.springframework.batch.core.ChunkListener;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -30,7 +29,7 @@ import java.util.Random;
 public class DailyLotto {
 
     private long totalParticipants;
-    private long restParticipants;
+    private long restParticipants = -1;
     private int randomIndex;
 
     private final JobRepository jobRepository;
@@ -73,9 +72,13 @@ public class DailyLotto {
                         new ChunkListener() {
                             @Override
                             public void beforeChunk(ChunkContext context) {
-                                if (restParticipants == 0) {
+                                if (restParticipants == -1) {
                                     totalParticipants = dailyLottoParticipantRepository.count();
                                     restParticipants = totalParticipants;
+                                    randomIndex = (restParticipants >= 1000)
+                                            ? random.nextInt(1000)
+                                            : random.nextInt((int) restParticipants);
+                                } else if (restParticipants != 0) {
                                     randomIndex = (restParticipants >= 1000)
                                             ? random.nextInt(1000)
                                             : random.nextInt((int) restParticipants);
@@ -90,9 +93,9 @@ public class DailyLotto {
                                 long getItems = stepExecution.getReadCount();
                                 restParticipants = totalParticipants - getItems;
                                 if (restParticipants >= 1000L) {
-                                    randomIndex = random.nextInt(1000);
+                                    randomIndex = random.nextInt(1000)+1;
                                 }  else if (restParticipants > 0L) {
-                                    randomIndex = random.nextInt((int) restParticipants);
+                                    randomIndex = random.nextInt((int) restParticipants)+1;
                                 }
                                 cnt = 0;
                             }
