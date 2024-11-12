@@ -1,5 +1,6 @@
 package com.quostomize.lotto.listener;
 
+import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.JobExecution;
@@ -8,11 +9,11 @@ import org.springframework.batch.core.JobExecutionListener;
 @Slf4j
 public class AfterLottoListener implements JobExecutionListener {
 
-    private final DailyLottoWinnerRepository dailyLottoWinnerRepository;
+    private final DailyLottoParticipantRepository dailyLottoParticipantRepository;
 
 
-    public  AfterLottoListener(DailyLottoWinnerRepository dailyLottoWinnerRepository) {
-        this.dailyLottoWinnerRepository = dailyLottoWinnerRepository;
+    public  AfterLottoListener(DailyLottoParticipantRepository dailyLottoParticipantRepository) {
+        this.dailyLottoParticipantRepository = dailyLottoParticipantRepository;
     }
 
     @Override
@@ -28,7 +29,8 @@ public class AfterLottoListener implements JobExecutionListener {
             return;
         }
         try {
-            dailyLottoWinnerRepository.truncateSomethingTable();
+            // 실제 운영 시에는 제거
+//            dailyLottoParticipantRepository.truncateDailyLottoWinner();
         } catch (Exception e) {
             log.error(String.valueOf(e));
         }

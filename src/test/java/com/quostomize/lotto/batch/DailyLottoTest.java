@@ -3,10 +3,12 @@ package com.quostomize.lotto.batch;
 import com.quostomize.lotto.config.TestBatchConfig;
 import com.quostomize.lotto.entity.DailyLottoParticipant;
 import com.quostomize.lotto.entity.DailyLottoWinner;
+import com.quostomize.lotto.entity.LottoWinnerRecord;
 import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import com.quostomize.lotto.repository.LottoWinnerRecordRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.*;
 import org.springframework.batch.item.Chunk;
@@ -34,8 +36,6 @@ import static org.mockito.Mockito.*;
 @SpringBatchTest
 @SpringBootTest(classes = {DailyLotto.class, TestBatchConfig.class})
 class DailyLottoTest {
-    private int cnt = 0;
-
     @Autowired
     private JobLauncherTestUtils jobLauncherTestUtils;
 
@@ -46,19 +46,22 @@ class DailyLottoTest {
     private Job lottoJob;
 
     @Autowired
+    private Job locateJob;
+
+    @Autowired
     private RepositoryItemReader<DailyLottoParticipant> participantReader;
 
+    @Autowired
+    private RepositoryItemReader<DailyLottoWinner> dailyWinnerReader;
 
-    private final ItemProcessor<DailyLottoParticipant, DailyLottoWinner> drawingProcessor =  new ItemProcessor<DailyLottoParticipant, DailyLottoWinner>() {
-
-        @Override
-        public DailyLottoWinner process(DailyLottoParticipant item) throws Exception {
-            return DailyLottoWinner.fromParticipant(item);
-            }
-    };
+    private final ItemProcessor<DailyLottoParticipant, DailyLottoWinner> drawingProcessor =
+            DailyLottoWinner::fromParticipant;
 
     @Autowired
     private RepositoryItemWriter<DailyLottoWinner> winnerWriter;
+
+    @Autowired
+    private RepositoryItemWriter<LottoWinnerRecord> winnerRecordWriter;
 
     @MockBean
     private DailyLottoParticipantRepository participantRepository;
@@ -70,13 +73,13 @@ class DailyLottoTest {
     private LottoWinnerRecordRepository winnerRecordRepository;
 
     private List<DailyLottoParticipant> testParticipants;
+    private List<DailyLottoWinner> testWinners;
 
     @BeforeEach
     void setUp() {
-        // 이전 Job 실행 데이터 정리
         jobRepositoryTestUtils.removeJobExecutions();
 
-        // 테스트용 참가자 데이터 생성
+        // 추첨 배치 테스트용 참가자 데이터 설정
         testParticipants = Arrays.asList(
                 DailyLottoParticipant.builder()
                         .dailyLottoApplicationRecordId(1L)
@@ -92,75 +95,105 @@ class DailyLottoTest {
                         .build()
         );
 
+        // 당첨자 기록 배치 테스트용 당첨자 데이터 설정
+        testWinners = Arrays.asList(
+                createDailyLottoWinner(1L),
+                createDailyLottoWinner(2L)
+        );
+
         // Repository mock 설정
         when(participantRepository.count()).thenReturn((long) testParticipants.size());
         when(participantRepository.findAll(any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(testParticipants))
                 .thenReturn(Page.empty());
+
+        when(winnerRepository.findAll(any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(testWinners))
+                .thenReturn(Page.empty());
     }
 
-//    @Test
-//    void testJobExecution() throws Exception {
-//        // Given
-//        JobParameters jobParameters = new JobParametersBuilder()
-//                .addLong("time", System.currentTimeMillis())
-//                .toJobParameters();
-//
-//        // When
-//        JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
-//
-//        // Then
-//        assertEquals(ExitStatus.COMPLETED, jobExecution.getExitStatus());
-//
-//        StepExecution stepExecution = jobExecution.getStepExecutions().iterator().next();
-//        assertEquals("lottoStep", stepExecution.getStepName());
-//        assertEquals(testParticipants.size(), stepExecution.getReadCount());
-//
-//        assertEquals(1, stepExecution.getWriteCount()); // 당첨자는 1명이어야 함
-//    }
-
+    // 추첨 배치 관련 테스트
     @Test
+    @DisplayName("참가자 Reader 테스트")
     void testParticipantReader() throws Exception {
-        // Given
         participantReader.setPageSize(1000);
-
-        // When
         DailyLottoParticipant participant = participantReader.read();
 
-        // Then
         assertNotNull(participant);
         assertTrue(testParticipants.contains(participant));
         verify(participantRepository).findAll(any(PageRequest.class));
     }
 
     @Test
+    @DisplayName("당첨자 추첨 Processor 테스트")
     void testDrawingProcessor() throws Exception {
-        // Given
         int winnerCount = 0;
-        int randomIndex = new Random().nextInt(3)+1;
-        // When
+        int randomIndex = new Random().nextInt(3) + 1;
+
         for (DailyLottoParticipant participant : testParticipants) {
-            if (participant.getCustomerId() == randomIndex ) {
+            if (participant.getCustomerId() == randomIndex) {
                 winnerCount++;
                 break;
             }
         }
 
-        // Then
         assertEquals(1, winnerCount);
     }
 
     @Test
+    @DisplayName("당첨자 Writer 테스트")
     void testWinnerWriter() throws Exception {
-        // Given
         DailyLottoWinner winner = DailyLottoWinner.fromParticipant(testParticipants.get(0));
         Chunk<DailyLottoWinner> chunk = new Chunk<>();
         chunk.add(winner);
 
-        // When
         winnerWriter.write(chunk);
 
-        // Then
         verify(winnerRepository, times(1)).save(any(DailyLottoWinner.class));
+    }
+
+    // 당첨자 기록 배치 관련 테스트
+//    @Test
+//    @DisplayName("당첨자 기록 Step 실행 테스트")
+//    void testLocationStep() throws Exception {
+//        JobParameters jobParameters = new JobParametersBuilder()
+//                .addLong("time", System.currentTimeMillis())
+//                .toJobParameters();
+//
+//        JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
+//
+//        assertEquals(ExitStatus.COMPLETED, jobExecution.getExitStatus());
+//        verify(winnerRecordRepository, times(testWinners.size())).save(any(LottoWinnerRecord.class));
+//    }
+
+    @Test
+    @DisplayName("당첨자 Reader 테스트")
+    void testDailyWinnerReader() throws Exception {
+        dailyWinnerReader.setPageSize(100);
+        DailyLottoWinner winner = dailyWinnerReader.read();
+
+        assertNotNull(winner);
+        assertTrue(testWinners.contains(winner));
+        verify(winnerRepository).findAll(any(PageRequest.class));
+    }
+
+    @Test
+    @DisplayName("당첨 기록 Writer 테스트")
+    void testWinnerRecordWriter() throws Exception {
+        LottoWinnerRecord record = LottoWinnerRecord.fromDailyWinner(testWinners.get(0));
+        Chunk<LottoWinnerRecord> chunk = new Chunk<>();
+        chunk.add(record);
+
+        winnerRecordWriter.write(chunk);
+
+        verify(winnerRecordRepository, times(1)).save(any(LottoWinnerRecord.class));
+    }
+
+    private DailyLottoWinner createDailyLottoWinner(Long id) {
+        return DailyLottoWinner.builder()
+                .dailyLottoParticipant(
+                        new DailyLottoParticipant(1L, id)
+                )
+                .build();
     }
 }

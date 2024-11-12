@@ -1,5 +1,6 @@
 package com.quostomize.lotto.listener;
 
+import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
@@ -16,10 +17,13 @@ public class DailyWinnerRecordListener implements JobExecutionListener {
     private final JobLauncher jobLauncher;
 
     private final Job nextJob;
+    
+    private final DailyLottoWinnerRepository dailyLottoWinnerRepository;
 
-    public DailyWinnerRecordListener(Job nextJob, JobLauncher jobLauncher) {
+    public DailyWinnerRecordListener(Job nextJob, JobLauncher jobLauncher, DailyLottoWinnerRepository dailyLottoWinnerRepository) {
         this.nextJob = nextJob;
         this.jobLauncher = jobLauncher;
+        this.dailyLottoWinnerRepository = dailyLottoWinnerRepository;
     }
 
     @Override
@@ -37,6 +41,8 @@ public class DailyWinnerRecordListener implements JobExecutionListener {
         }
 
         try {
+            // 기존 오늘 당첨자 제거
+            dailyLottoWinnerRepository.truncateDailyLottoWinner();
             // 두 번째 배치 실행
             jobLauncher.run(nextJob, jobExecution.getJobParameters());
         } catch (Exception e) {

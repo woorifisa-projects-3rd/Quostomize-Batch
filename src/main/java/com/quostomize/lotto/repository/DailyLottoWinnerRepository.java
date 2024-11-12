@@ -10,6 +10,6 @@ public interface DailyLottoWinnerRepository extends JpaRepository<DailyLottoWinn
 
     @Transactional
     @Modifying
-    @Query(value = "truncate daily_lotto_winners", nativeQuery = true)
-    void truncateSomethingTable();
+    @Query(value = "TRUNCATE daily_lotto_winners", nativeQuery = true)
+    void truncateDailyLottoWinner();
 }

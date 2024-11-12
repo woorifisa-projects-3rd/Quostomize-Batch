@@ -70,7 +70,7 @@ public class DailyLotto {
     public Job locateJob() {
         return new JobBuilder("locateJob", jobRepository)
                 .start(dailyWinnerlocateStep())
-                .listener(new DailyWinnerRecordListener(lottoJob(), jobLauncher))
+                .listener(new DailyWinnerRecordListener(lottoJob(), jobLauncher, dailyLottoWinnerRepository))
                 .build();
     }
 
@@ -132,7 +132,7 @@ public class DailyLotto {
     public Job lottoJob() {
         return new JobBuilder("lottoJob", jobRepository)
                 .start(dailyLottoStep())
-                .listener(new AfterLottoListener(dailyLottoWinnerRepository))
+                .listener(new AfterLottoListener(dailyLottoParticipantRepository))
                 .build();
     }
 
