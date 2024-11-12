@@ -39,6 +39,6 @@ public class LottoSchedule {
                 .addString("executionId", executionId)
                 .toJobParameters();
 
-        jobLauncher.run(jobRegistry.getJob("lottoJob"), jobParameters);
+        jobLauncher.run(jobRegistry.getJob("locateJob"), jobParameters);
     }
 }

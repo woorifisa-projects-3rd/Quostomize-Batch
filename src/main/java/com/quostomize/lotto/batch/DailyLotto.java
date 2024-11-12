@@ -2,6 +2,9 @@ package com.quostomize.lotto.batch;
 
 import com.quostomize.lotto.entity.DailyLottoParticipant;
 import com.quostomize.lotto.entity.DailyLottoWinner;
+import com.quostomize.lotto.entity.LottoWinnerRecord;
+import com.quostomize.lotto.listener.AfterLottoListener;
+import com.quostomize.lotto.listener.DailyWinnerRecordListener;
 import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import com.quostomize.lotto.repository.LottoWinnerRecordRepository;
@@ -10,6 +13,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -20,6 +24,7 @@ import org.springframework.batch.item.data.builder.RepositoryItemReaderBuilder;
 import org.springframework.batch.item.data.builder.RepositoryItemWriterBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.HashMap;
@@ -34,6 +39,7 @@ public class DailyLotto {
 
     private final JobRepository jobRepository;
     private final PlatformTransactionManager platformTransactionManager;
+    private final JobLauncher jobLauncher;
 
     private final DailyLottoWinnerRepository dailyLottoWinnerRepository;
     private final DailyLottoParticipantRepository dailyLottoParticipantRepository;
@@ -43,20 +49,90 @@ public class DailyLotto {
 
     private int cnt = 0;
 
-    public DailyLotto(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, DailyLottoWinnerRepository dailyLottoWinnerRepository, DailyLottoParticipantRepository dailyLottoParticipantRepository, LottoWinnerRecordRepository lottoWinnerRecordRepository) {
+    public DailyLotto(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, DailyLottoWinnerRepository dailyLottoWinnerRepository, DailyLottoParticipantRepository dailyLottoParticipantRepository, LottoWinnerRecordRepository lottoWinnerRecordRepository, JobLauncher jobLauncher) {
         this.jobRepository = jobRepository;
         this.platformTransactionManager = platformTransactionManager;
         this.dailyLottoWinnerRepository = dailyLottoWinnerRepository;
         this.dailyLottoParticipantRepository = dailyLottoParticipantRepository;
         this.lottoWinnerRecordRepository = lottoWinnerRecordRepository;
+        this.jobLauncher = jobLauncher;
         this.random = new Random();
     }
+
+    /*
+
+    기존에 있던 오늘 당첨자를 당첨자 기록 테이블로 옮기기
+
+     */
+
+    @Primary
+    @Bean
+    public Job locateJob() {
+        return new JobBuilder("locateJob", jobRepository)
+                .start(dailyWinnerlocateStep())
+                .listener(new DailyWinnerRecordListener(lottoJob(), jobLauncher))
+                .build();
+    }
+
+    @Primary
+    @Bean
+    public Step dailyWinnerlocateStep() {
+        return new StepBuilder("locateStep", jobRepository)
+                .<DailyLottoWinner, LottoWinnerRecord> chunk(100, platformTransactionManager)
+                .reader(dailyWinnerReader())
+                .processor(winnerRecordProcessor())
+                .writer(winnerRecordWriter())
+                .build();
+    }
+
+    @Primary
+    @Bean
+    public RepositoryItemReader<DailyLottoWinner> dailyWinnerReader() {
+
+        return new RepositoryItemReaderBuilder<DailyLottoWinner>()
+                .name("dailyWinnerReader")
+                .pageSize(100)
+                .methodName("findAll")
+                .repository(dailyLottoWinnerRepository)
+                .sorts(new HashMap<>())
+                .build();
+    }
+
+    @Primary
+    @Bean
+    public ItemProcessor<DailyLottoWinner, LottoWinnerRecord> winnerRecordProcessor() {
+        return new ItemProcessor<DailyLottoWinner, LottoWinnerRecord>() {
+
+            @Override
+            public LottoWinnerRecord process(DailyLottoWinner item) throws Exception {
+                return LottoWinnerRecord.fromDailyWinner(item);
+            }
+        };
+    }
+
+    @Primary
+    @Bean
+    public RepositoryItemWriter<LottoWinnerRecord> winnerRecordWriter() {
+        return new RepositoryItemWriterBuilder<LottoWinnerRecord>()
+                .repository(lottoWinnerRecordRepository)
+                .methodName("save")
+                .build();
+    }
+
+
+    /*
+
+    오늘 참여자에서 당첨자들 추첨
+
+     */
+
 
 
     @Bean
     public Job lottoJob() {
         return new JobBuilder("lottoJob", jobRepository)
                 .start(dailyLottoStep())
+                .listener(new AfterLottoListener(dailyLottoWinnerRepository))
                 .build();
     }
 
@@ -107,7 +183,6 @@ public class DailyLotto {
                         }
                 )
                 .build();
-
     }
 
     @Bean
@@ -146,5 +221,4 @@ public class DailyLotto {
                 .methodName("save")
                 .build();
     }
-
 }

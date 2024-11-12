@@ -3,10 +3,12 @@ package com.quostomize.lotto.entity;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
 @Table(name="daily_lotto_participant")
+@NoArgsConstructor
 public class DailyLottoParticipant {
 
     @Id
@@ -15,7 +17,7 @@ public class DailyLottoParticipant {
     private Long dailyLottoApplicationRecordId;
 
     @Column(name="customer_id")
-    private final Long customerId;
+    private Long customerId;
 
     @Builder
     public DailyLottoParticipant(Long dailyLottoApplicationRecordId, Long customerId) {

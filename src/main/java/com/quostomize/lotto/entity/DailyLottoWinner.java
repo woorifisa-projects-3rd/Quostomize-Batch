@@ -4,6 +4,7 @@ package com.quostomize.lotto.entity;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -11,6 +12,7 @@ import java.time.ZoneId;
 @Entity
 @Getter
 @Table(name = "daily_lotto_winners")
+@NoArgsConstructor
 public class DailyLottoWinner {
 
     @Id
@@ -19,10 +21,10 @@ public class DailyLottoWinner {
     private Long LottoWinnerId;
 
     @Column(name="lotto_date")
-    private final LocalDate lottoDate;
+    private LocalDate lottoDate;
 
     @Column(name="customer_id")
-    private final Long customerId;
+    private Long customerId;
 
 
     private DailyLottoWinner(Long customerId) {
