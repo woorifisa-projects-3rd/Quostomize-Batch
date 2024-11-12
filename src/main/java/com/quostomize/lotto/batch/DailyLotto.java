@@ -5,6 +5,7 @@ import com.quostomize.lotto.entity.DailyLottoWinner;
 import com.quostomize.lotto.repository.DailyLottoParticipantRepository;
 import com.quostomize.lotto.repository.DailyLottoWinnerRepository;
 import com.quostomize.lotto.repository.LottoWinnerRecordRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.batch.core.ChunkListener;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -49,14 +50,7 @@ public class DailyLotto {
         this.dailyLottoWinnerRepository = dailyLottoWinnerRepository;
         this.dailyLottoParticipantRepository = dailyLottoParticipantRepository;
         this.lottoWinnerRecordRepository = lottoWinnerRecordRepository;
-        this.totalParticipants = dailyLottoParticipantRepository.count();
-        this.restParticipants = this.totalParticipants;
         this.random = new Random();
-        if (this.restParticipants >= 1000) {
-            this.randomIndex = this.random.nextInt(1000);
-        } else {
-            this.randomIndex = this.random.nextInt((int) this.restParticipants);
-        }
     }
 
 
@@ -74,10 +68,18 @@ public class DailyLotto {
                 .reader(participantReader())
                 .processor(drawingProcessor())
                 .writer(winnerWriter())
+                // chunkListener를 통해 남은 아이템 계산
                 .listener(
                         new ChunkListener() {
                             @Override
                             public void beforeChunk(ChunkContext context) {
+                                if (restParticipants == 0) {
+                                    totalParticipants = dailyLottoParticipantRepository.count();
+                                    restParticipants = totalParticipants;
+                                    randomIndex = (restParticipants >= 1000)
+                                            ? random.nextInt(1000)
+                                            : random.nextInt((int) restParticipants);
+                                }
                                 ChunkListener.super.beforeChunk(context);
                             }
 
@@ -86,20 +88,12 @@ public class DailyLotto {
                                 ChunkListener.super.afterChunk(context);
                                 StepExecution stepExecution = context.getStepContext().getStepExecution();
                                 long getItems = stepExecution.getReadCount();
-                                System.out.println("전체 참여자 = "+totalParticipants);
-                                System.out.println("불러왔던 아이템들 개수 = "+ getItems);
                                 restParticipants = totalParticipants - getItems;
-                                System.out.println("랜덤인덱스 = "+ randomIndex+ "였음");
-                                System.out.println("현재 restParticipant = " +restParticipants  );
-                                if (restParticipants >= 1000) {
+                                if (restParticipants >= 1000L) {
                                     randomIndex = random.nextInt(1000);
-                                } else if (restParticipants == 0) {
-                                    restParticipants = totalParticipants;
-                                } else {
+                                }  else if (restParticipants > 0L) {
                                     randomIndex = random.nextInt((int) restParticipants);
                                 }
-                                System.out.println("다음 랜덤인덱스 = "+ randomIndex+ "임");
-                                System.out.println("남은 개수 = " + restParticipants);
                                 cnt = 0;
                             }
 

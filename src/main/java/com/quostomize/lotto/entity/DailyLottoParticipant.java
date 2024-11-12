@@ -1,6 +1,7 @@
 package com.quostomize.lotto.entity;
 
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 
 @Entity
@@ -11,9 +12,15 @@ public class DailyLottoParticipant {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name="daily_lotto_participant_id")
-    private Long lottoApplicationRecordId;
+    private Long dailyLottoApplicationRecordId;
 
     @Column(name="customer_id")
-    private Long customerId;
+    private final Long customerId;
+
+    @Builder
+    public DailyLottoParticipant(Long dailyLottoApplicationRecordId, Long customerId) {
+        this.dailyLottoApplicationRecordId = dailyLottoApplicationRecordId;
+        this.customerId = customerId;
+    }
 
 }
