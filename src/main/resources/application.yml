@@ -5,18 +5,21 @@ spring:
   batch:
     job:
       enabled: false
+    jdbc:
+      initialize-schema: always
+
 
   datasource-data:
-    url: ${DB_URL}
+    jdbc-url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   datasource-meta:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    jdbc-url:
-    username:
-    password:
+    jdbc-url: ${META_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   data:
     redis:

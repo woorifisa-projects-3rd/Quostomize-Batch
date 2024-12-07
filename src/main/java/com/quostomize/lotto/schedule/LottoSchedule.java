@@ -20,25 +20,14 @@ public class LottoSchedule {
     private final JobLauncher jobLauncher;
     private final JobRegistry jobRegistry;
 
-    // 실제 운영용: 매일 정오에 실행
-//    @Scheduled(cron = "0 0 12 * * *", zone = "Asia/Seoul")
-//    public void runDailyLotto() throws Exception {
-//        String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-//        JobParameters jobParameters = new JobParametersBuilder()
-//                .addString("date", date)
-//                .toJobParameters();
-//
-//        jobLauncher.run(jobRegistry.getJob("lottoJob"), jobParameters);
-//    }
-
-    // 테스트용: 매 분 실
-    @Scheduled(cron = "10 * * * * *", zone = "Asia/Seoul")
-    public void runTestLotto() throws Exception {
-        String executionId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"));
+    @Scheduled(cron = "0 0 12 * * *", zone = "Asia/Seoul")
+    public void runDailyLotto() throws Exception {
+        String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         JobParameters jobParameters = new JobParametersBuilder()
-                .addString("executionId", executionId)
+                .addString("date", date)
                 .toJobParameters();
 
-        jobLauncher.run(jobRegistry.getJob("locateJob"), jobParameters);
+        jobLauncher.run(jobRegistry.getJob("lottoJob"), jobParameters);
     }
+
 }
